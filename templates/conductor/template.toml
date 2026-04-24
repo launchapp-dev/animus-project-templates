@@ -10,6 +10,14 @@ next_steps = [
   "animus requirements execute --id REQ-001",
 ]
 
+[[packs]]
+id = "ao.requirement"
+activate = true
+
+[[packs]]
+id = "ao.task"
+activate = true
+
 [source]
 mode = "copy"
 root = "skeleton"
