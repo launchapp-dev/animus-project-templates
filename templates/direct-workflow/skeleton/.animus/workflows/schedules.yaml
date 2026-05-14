@@ -1,0 +1,20 @@
+# Schedules fire workflows on cron expressions, evaluated by the daemon each tick.
+#
+# This template is for human-driven execution — schedules are intentionally
+# EMPTY by default. You run workflows explicitly with:
+#
+#   animus workflow run --task-id TASK-XXX --sync
+#
+# If you later decide you want autonomous progression, uncomment and adapt
+# the example below.
+
+schedules: []
+
+# Example: pick up the next ready task every 30 minutes. Disabled by default
+# because this template prefers explicit human invocation.
+#
+# schedules:
+#   - id: work-planner
+#     cron: "*/30 * * * *"
+#     workflow_ref: standard-workflow
+#     enabled: false

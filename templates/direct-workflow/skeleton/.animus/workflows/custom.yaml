@@ -1,7 +1,23 @@
+# Top-level project config consumed by the Animus daemon.
+#
+# Pattern: direct-workflow
+#
+# This template is for projects that want a human in the loop on every step.
+# The standard-workflow includes an explicit `mode: manual` approval phase
+# and ships with `auto_merge: false`. Schedules and triggers are empty by
+# default — you run workflows yourself with `animus workflow run`.
+#
+# Keys you can tune here:
+#   - default_workflow_ref : which workflow runs when you `animus workflow run --task-id <id>`
+#                            without an explicit --workflow flag.
+#   - tools_allowlist      : shell programs the daemon is allowed to invoke from agents.
+
 default_workflow_ref: standard-workflow
 
-# Pattern: direct-workflow
-# Default workflows are designed for explicit, human-triggered runs.
 tools_allowlist:
   - cargo
+  - npm
+  - pnpm
+  - git
+  - gh
   - animus

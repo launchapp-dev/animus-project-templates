@@ -1,0 +1,121 @@
+# The standard task-delivery workflow for human-in-the-loop projects.
+#
+# This template's defining feature: a `mode: manual` approval gate after
+# review and before push. The workflow pauses there until you explicitly
+# approve via `animus workflow phase approve --workflow-id WF-XXX --phase manual-approval`.
+#
+# Phase modes:
+#
+#   - mode: command  — runs a shell command (git, gh, cargo, npm, animus, ...)
+#   - mode: agent    — invokes an agent from agents.yaml with the given directive
+#   - mode: manual   — pauses for explicit human approval
+#
+# `decision_contract` blocks are tighter here than in other templates
+# (higher confidence floors, lower max_risk) to favor pause-and-ask behavior
+# over autonomous progression.
+
+phases:
+  subject-activate:
+    mode: command
+    directive: Mark the dispatch subject as in-progress before any work starts.
+    command:
+      program: animus
+      args: ["task", "status", "--id", "{subject_id}", "--status", "in-progress"]
+      cwd_mode: project_root
+      timeout_secs: 10
+      success_exit_codes: [0, 1]
+
+  implementation:
+    mode: agent
+    agent_id: default
+    directive: |
+      Implement the task end-to-end on the current working branch.
+
+      - Read acceptance criteria via animus.task.get.
+      - Make focused changes only — no scope creep.
+      - Add or update tests for new behavior. Run the test suite locally.
+      - Commit with a conventional-commit message.
+      - Do NOT push or open a PR — those are explicit gates later.
+      - When uncertain, return verdict=rework with a clarifying question.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.8
+      max_risk: low
+      allow_missing_decision: false
+
+  review:
+    mode: agent
+    agent_id: reviewer
+    directive: |
+      Review the implementation against the task's acceptance criteria.
+
+      - Look for bugs, edge cases, missing tests, and security issues.
+      - In this project, prefer conservative gating over speed.
+      - If you find any non-trivial issue, return verdict=rework with a
+        precise spec of what must change.
+      - If the diff is production-ready AND on-scope, return verdict=advance.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.8
+      max_risk: low
+      allow_missing_decision: false
+    on_verdict:
+      rework:
+        target: implementation
+
+  manual-approval:
+    mode: manual
+    directive: |
+      Human approval gate. The workflow pauses here until you explicitly
+      approve via `animus workflow phase approve --phase manual-approval`.
+
+      Recommended pre-approval checklist:
+        - inspect `git diff` on the working branch
+        - review the reviewer's verdict and notes
+        - run any project-specific smoke checks locally
+        - confirm the task acceptance criteria are met
+    decision_contract:
+      required_evidence: []
+      min_confidence: 1.0
+      max_risk: low
+      allow_missing_decision: false
+
+  push-branch:
+    mode: command
+    directive: Push the approved branch to origin.
+    command:
+      program: git
+      args: ["push", "-u", "origin", "HEAD"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+  create-pr:
+    mode: command
+    directive: Open a pull request for the pushed branch (draft by default).
+    command:
+      program: gh
+      args: ["pr", "create", "--fill", "--draft"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+workflows:
+  - id: standard-workflow
+    name: Direct Workflow Delivery
+    description: |
+      Human-in-the-loop delivery — implement, review, MANUAL APPROVAL,
+      push, open draft PR. Auto-merge is OFF; the human approves both
+      the manual-approval phase and the PR merge on GitHub.
+    phases:
+      - subject-activate
+      - implementation
+      - review
+      - manual-approval
+      - push-branch
+      - create-pr
+    post_success:
+      merge:
+        strategy: squash
+        auto_merge: false
+        cleanup_worktree: true

@@ -1,0 +1,24 @@
+# Triggers fire workflows on external events instead of cron.
+#
+# Supported types:
+#   - github_webhook  — registers a POST /triggers/{id} HTTP endpoint
+#   - webhook         — generic signed webhook
+#   - file_watcher    — watches glob paths inside the project root
+#
+# This template ships with NO active triggers. Uncomment and adapt the example
+# below to react to GitHub events.
+
+triggers: []
+
+# Example: when a PR is opened on this repo's GitHub, run the standard
+# delivery workflow (e.g. to drive review automation).
+#
+# triggers:
+#   - id: pr-opened
+#     type: github_webhook
+#     workflow_ref: standard-workflow
+#     enabled: false
+#     config:
+#       events: ["pull_request"]
+#       secret_env: ANIMUS_GITHUB_WEBHOOK_SECRET
+#       max_triggers_per_minute: 10

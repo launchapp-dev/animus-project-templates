@@ -1,0 +1,19 @@
+# Triggers fire workflows on external events.
+#
+# This template is for human-driven execution — triggers are EMPTY by default.
+# Uncomment the example below if you want a webhook to enqueue (but not
+# auto-run) workflows.
+
+triggers: []
+
+# Example: queue (do not auto-run) a workflow when a webhook fires.
+# Combine with `enabled: false` until you've audited the integration.
+#
+# triggers:
+#   - id: webhook-enqueue
+#     type: webhook
+#     workflow_ref: standard-workflow
+#     enabled: false
+#     config:
+#       secret_env: ANIMUS_WEBHOOK_SECRET
+#       max_triggers_per_minute: 5

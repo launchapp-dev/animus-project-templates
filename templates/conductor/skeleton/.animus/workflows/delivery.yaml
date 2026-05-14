@@ -1,0 +1,117 @@
+# The standard task-delivery workflow for conductor-managed projects.
+#
+# Phases run in order. Each phase has a `mode`:
+#
+#   - mode: command  — runs a shell command (git, gh, cargo, npm, animus, ...)
+#   - mode: agent    — invokes an agent from agents.yaml with the given directive
+#   - mode: manual   — pauses for explicit human approval
+#
+# `decision_contract` blocks let agents return a verdict (advance | rework | abort)
+# with confidence and risk scores; the runtime gates progression on those.
+#
+# `on_verdict` redirects rework verdicts back to an earlier phase instead of
+# failing the whole workflow.
+
+phases:
+  subject-activate:
+    mode: command
+    directive: Mark the dispatch subject as in-progress before any work starts.
+    command:
+      program: animus
+      args: ["task", "status", "--id", "{subject_id}", "--status", "in-progress"]
+      cwd_mode: project_root
+      timeout_secs: 10
+      success_exit_codes: [0, 1]
+
+  implementation:
+    mode: agent
+    agent_id: default
+    directive: |
+      Implement the task end-to-end on the current working branch.
+
+      - Read acceptance criteria via animus.task.get.
+      - Read any linked design note from the architect.
+      - Make focused changes only.
+      - Add or update tests for new behavior. Run the test suite locally.
+      - Commit with a conventional-commit message.
+      - Do NOT push or open a PR — the next phases handle that.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.7
+      max_risk: medium
+      allow_missing_decision: false
+
+  review:
+    mode: agent
+    agent_id: reviewer
+    directive: |
+      Review the implementation against the task's acceptance criteria.
+
+      - Look for bugs, edge cases, missing tests, and security issues.
+      - If anything is critical, return verdict=rework with a precise spec
+        of what must change.
+      - If the diff is production-ready, return verdict=advance.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.7
+      max_risk: medium
+      allow_missing_decision: false
+    on_verdict:
+      rework:
+        target: implementation
+
+  qa:
+    mode: agent
+    agent_id: qa
+    directive: |
+      Validate the implementation against the acceptance criteria from a
+      user-facing perspective. Run the test suite. Add coverage for missing
+      edge cases. Return verdict=rework with a precise spec if behavior gaps
+      remain; otherwise verdict=advance.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.75
+      max_risk: medium
+      allow_missing_decision: false
+    on_verdict:
+      rework:
+        target: implementation
+
+  push-branch:
+    mode: command
+    directive: Push the current branch to origin so a PR can be opened.
+    command:
+      program: git
+      args: ["push", "-u", "origin", "HEAD"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+  create-pr:
+    mode: command
+    directive: Open a pull request for the pushed branch.
+    command:
+      program: gh
+      args: ["pr", "create", "--fill"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+workflows:
+  - id: standard-workflow
+    name: Conductor Delivery Workflow
+    description: |
+      Standard delivery — implement, review, QA, push, open PR.
+      Reviewer and QA both gate; rework verdicts route back to implementation.
+    phases:
+      - subject-activate
+      - implementation
+      - review
+      - qa
+      - push-branch
+      - create-pr
+    post_success:
+      merge:
+        strategy: squash
+        auto_merge: false
+        cleanup_worktree: true

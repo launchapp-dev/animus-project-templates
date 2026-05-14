@@ -1,7 +1,23 @@
+# Top-level project config consumed by the Animus daemon.
+#
+# Pattern: conductor
+#
+# This template is for projects that want a planning loop on top of their
+# delivery loop. You write requirements (REQ-*); the PO agent decomposes them
+# into ready tasks (requirements.yaml); the daemon picks up ready tasks and
+# runs them through delivery.yaml.
+#
+# Keys you can tune here:
+#   - default_workflow_ref : which workflow runs when you `animus workflow run --task-id <id>`
+#                            without an explicit --workflow flag.
+#   - tools_allowlist      : shell programs the daemon is allowed to invoke from agents.
+
 default_workflow_ref: standard-workflow
 
-# Pattern: conductor
-# Use `conductor-workflow` to translate requirements into queued delivery work.
 tools_allowlist:
   - cargo
+  - npm
+  - pnpm
+  - git
+  - gh
   - animus

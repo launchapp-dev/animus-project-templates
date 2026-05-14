@@ -1,0 +1,99 @@
+# The standard task-delivery workflow.
+#
+# Phases run in order. Each phase has a `mode`:
+#
+#   - mode: command   — runs a shell command. Useful for git, gh, cargo, npm, etc.
+#   - mode: agent     — invokes an agent from agents.yaml with the given directive.
+#   - mode: manual    — pauses the workflow and waits for explicit human approval.
+#
+# `decision_contract` blocks let agents return a verdict (advance | rework | abort)
+# with a confidence score and risk level. The runtime gates progression on those.
+#
+# `on_verdict` (per-phase) lets you redirect rework verdicts back to an earlier phase
+# instead of failing the whole workflow.
+
+phases:
+  subject-activate:
+    mode: command
+    directive: Mark the dispatch subject as in-progress before any work starts.
+    command:
+      program: animus
+      args: ["task", "status", "--id", "{subject_id}", "--status", "in-progress"]
+      cwd_mode: project_root
+      timeout_secs: 10
+      success_exit_codes: [0, 1]
+
+  implementation:
+    mode: agent
+    agent_id: default
+    directive: |
+      Implement the task end-to-end on the current working branch.
+
+      - Read acceptance criteria via animus.task.get.
+      - Make focused changes only — no scope creep.
+      - Add or update tests for new behavior.
+      - Run the project's test suite locally before committing.
+      - Commit with a conventional-commit message.
+      - Do NOT push or open a PR — the next phases handle that.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.7
+      max_risk: medium
+      allow_missing_decision: false
+
+  review:
+    mode: agent
+    agent_id: reviewer
+    directive: |
+      Review the implementation against the task's acceptance criteria.
+
+      - Look for bugs, edge cases, missing tests, and security issues.
+      - If anything is critical, return verdict=rework with a precise spec
+        of what must change. Implementation is the implementer's job, not yours.
+      - If the diff is production-ready as-is, return verdict=advance.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.7
+      max_risk: medium
+      allow_missing_decision: false
+    on_verdict:
+      rework:
+        target: implementation
+
+  push-branch:
+    mode: command
+    directive: Push the current branch to origin so a PR can be opened.
+    command:
+      program: git
+      args: ["push", "-u", "origin", "HEAD"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+  create-pr:
+    mode: command
+    directive: Open a pull request for the pushed branch.
+    command:
+      program: gh
+      args: ["pr", "create", "--fill"]
+      cwd_mode: project_root
+      timeout_secs: 60
+      success_exit_codes: [0]
+
+workflows:
+  - id: standard-workflow
+    name: Task Queue Delivery Workflow
+    description: |
+      Standard delivery loop — implement, review, push, open PR.
+      The reviewer phase gates merge; rework verdicts route back to implementation.
+    phases:
+      - subject-activate
+      - implementation
+      - review
+      - push-branch
+      - create-pr
+    post_success:
+      merge:
+        strategy: squash
+        auto_merge: false
+        cleanup_worktree: true

@@ -1,0 +1,66 @@
+# Requirements -> Tasks decomposition workflow.
+#
+# This is the conductor pattern's planning side. The PO agent reads a
+# requirement, decomposes it into ready tasks, and (optionally) bootstraps
+# their execution by enqueuing each ready task for the standard delivery
+# workflow.
+
+phases:
+  refine-requirement:
+    mode: agent
+    agent_id: po
+    directive: |
+      Read the requirement via animus.requirements.get and any tasks already
+      linked to it via animus.task.list --requirement-id REQ-XXX.
+
+      Decompose the requirement into 3-7 implementation-ready tasks. For each:
+        - sharp, action-oriented title
+        - description with concrete scope
+        - 2-5 verifiable acceptance criteria
+        - priority (must / should / could)
+        - task_type (feature | bug | chore | refactor | docs)
+        - dependencies via --blocked-by when ordering matters
+
+      Create each task with `animus task create` and link it to the parent
+      requirement. When complete, mark the requirement as planned.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.8
+      max_risk: low
+      allow_missing_decision: false
+
+  bootstrap-execution:
+    mode: agent
+    agent_id: po
+    directive: |
+      For each ready, unblocked task linked to this requirement, enqueue
+      it for the standard delivery workflow via animus.task.next /
+      animus.workflow.run.
+
+      Skip tasks that are blocked, paused, or already in-progress. Avoid
+      duplicate dispatches — read animus.queue.list before enqueuing.
+    decision_contract:
+      required_evidence: []
+      min_confidence: 0.7
+      max_risk: medium
+      allow_missing_decision: false
+
+workflows:
+  - id: requirements-workflow
+    name: Requirement Planning Workflow
+    description: |
+      The PO agent reads a REQ-* record, decomposes it into ready tasks,
+      and links them back. Run this when you've added a new requirement
+      and want it broken down into actionable work.
+    phases:
+      - refine-requirement
+
+  - id: requirements-execute-workflow
+    name: Requirement Plan + Execute
+    description: |
+      Same as requirements-workflow, but ALSO enqueues each ready task for
+      the standard delivery workflow when planning is done. Use this when
+      you want the requirement to flow straight from "described" to "shipped".
+    phases:
+      - refine-requirement
+      - bootstrap-execution

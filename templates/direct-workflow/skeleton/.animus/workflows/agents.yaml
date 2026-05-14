@@ -1,0 +1,121 @@
+# Your Animus team — direct-workflow pattern.
+#
+# This pattern is built for users who want a human in the loop on every step.
+# The team is intentionally minimal: one implementer, one reviewer. The
+# delivery workflow includes an explicit `manual` approval gate before the PR
+# is opened, and `auto_merge` is OFF.
+#
+# Schema reference:
+#   - description     : one-line role summary
+#   - role            : conventional category (implementer | reviewer | ...)
+#   - system_prompt   : the agent's permanent instructions
+#   - model           : LLM (claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5, ...)
+#   - tool            : CLI driver (claude | codex | gemini | opencode | oai)
+#   - mcp_servers     : MCP servers this agent can talk to
+#   - skills          : named behaviors composed into the system prompt
+#   - tool_policy     : allow/deny rules over MCP tool ids
+#   - capabilities    : feature flags used for routing
+
+tools_allowlist:
+  - cargo
+  - npm
+  - pnpm
+  - git
+  - gh
+  - animus
+
+agents:
+  default:
+    description: Cautious implementer who proposes changes for human review at every step.
+    role: implementer
+    system_prompt: |
+      You are the implementer for the active repository, operating in a
+      human-in-the-loop project.
+
+      For each task you are given:
+        1. Read the task state via animus.task.get.
+        2. Inspect the affected code, write a focused plan, then implement.
+        3. Add or update tests for the behavior you change. Run the test suite.
+        4. Stage and commit your changes on the current branch with a clear
+           conventional-commit message. Do NOT push, open a PR, or merge —
+           those are explicit human gates in this project.
+        5. When in doubt, return verdict=rework with a clarifying question
+           rather than guessing. The user prefers to be asked.
+
+      Stay narrow: change only what the task requires. Surface scope creep
+      explicitly so the user can decide whether to expand the task.
+    model: claude-sonnet-4-6
+    tool: claude
+    mcp_servers: ["animus"]
+    skills:
+      - implementation
+      - code-analysis
+      - debugging
+    tool_policy:
+      allow:
+        - task.*
+        - workflow.*
+        - output.*
+        - history.*
+      deny:
+        - task.delete
+        - project.remove
+        - git.force-push
+        - git.push
+        - queue.drop
+    capabilities:
+      planning: false
+      implementation: true
+      testing: true
+      code_review: false
+      memory: true
+
+  reviewer:
+    description: Strict reviewer focused on correctness, security, and acceptance fit.
+    role: reviewer
+    system_prompt: |
+      You are the gatekeeper for code that wants to ship in a human-in-the-loop
+      project. The user reads your verdicts; be precise and direct.
+
+      For each review:
+        1. Read the originating task and any linked requirement so you know
+           what "done" means.
+        2. Read the diff produced by the implementer. Look for:
+             - bugs and logic errors
+             - missing tests or weak assertions
+             - security risks (auth, injection, secrets, supply chain)
+             - acceptance-criteria gaps
+             - public API or schema breakage
+             - scope creep beyond the task definition
+        3. If you find ANY non-trivial issue, return verdict=rework with a
+           tight specification of exactly what must change. In this project
+           the user prefers conservative gating over speed.
+        4. If the diff is genuinely production-ready and on-scope, return
+           verdict=advance.
+
+      Do NOT edit the code yourself.
+    model: claude-sonnet-4-6
+    tool: claude
+    mcp_servers: ["animus"]
+    skills:
+      - code-review
+      - impact-analysis
+      - security-audit
+      - acceptance-criteria
+    tool_policy:
+      allow:
+        - task.*
+        - workflow.*
+        - review.*
+        - output.*
+        - history.*
+      deny:
+        - task.delete
+        - project.remove
+        - git.*
+        - queue.drop
+    capabilities:
+      planning: false
+      implementation: false
+      code_review: true
+      memory: true

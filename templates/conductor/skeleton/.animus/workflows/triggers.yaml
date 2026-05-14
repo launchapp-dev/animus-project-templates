@@ -1,0 +1,25 @@
+# Triggers fire workflows on external events.
+#
+# Supported types:
+#   - github_webhook  — registers a POST /triggers/{id} HTTP endpoint
+#   - webhook         — generic signed webhook
+#   - file_watcher    — watches glob paths inside the project root
+#
+# This template ships with NO active triggers. Uncomment the example below
+# to react to GitHub events in real time.
+
+triggers: []
+
+# Example: when a new GitHub issue lands, run the requirements planning
+# workflow against it (your PO agent's directive can read the issue body
+# from dispatch_input and turn it into a REQ-* + tasks).
+#
+# triggers:
+#   - id: github-issue-opened
+#     type: github_webhook
+#     workflow_ref: requirements-workflow
+#     enabled: false
+#     config:
+#       events: ["issues"]
+#       secret_env: ANIMUS_GITHUB_WEBHOOK_SECRET
+#       max_triggers_per_minute: 10

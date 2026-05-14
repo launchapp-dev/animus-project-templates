@@ -1,0 +1,21 @@
+# Schedules fire workflows on cron expressions, evaluated by the daemon each tick.
+#
+# Each entry needs an id, a cron expression, a workflow_ref (id of a workflow
+# defined elsewhere in this directory), and an enabled flag.
+#
+# This template ships with NO active schedules — you trigger workflows manually
+# (or via `animus workflow run --task-id ...`) until you're ready to automate.
+# Uncomment and adapt the example below when you want the daemon to pick up
+# ready tasks autonomously.
+
+schedules: []
+
+# Example: every 5 minutes, run the standard delivery workflow against the
+# next ready task. Combine with `animus daemon start --autonomous` for a fully
+# autonomous loop.
+#
+# schedules:
+#   - id: work-planner
+#     cron: "*/5 * * * *"
+#     workflow_ref: standard-workflow
+#     enabled: true

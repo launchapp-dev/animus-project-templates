@@ -1,0 +1,155 @@
+# Your Animus team — define each agent like a job description.
+#
+# Animus reads this file at startup. Edits take effect on the next workflow run
+# (or daemon restart). Each entry under `agents:` is one agent with:
+#
+#   - description     : one-line role summary (shows up in `animus agent list`)
+#   - role            : conventional category (implementer | reviewer | product_owner | ...)
+#   - system_prompt   : the agent's permanent instructions
+#   - model           : which LLM (claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5, ...)
+#   - tool            : which CLI driver (claude | codex | gemini | opencode | oai)
+#   - mcp_servers     : MCP servers this agent can talk to (animus is the orchestrator surface)
+#   - skills          : named behaviors composed into the agent's system prompt at runtime
+#   - tool_policy     : allow/deny rules over MCP tool ids (glob-style)
+#   - capabilities    : feature flags the runtime uses for routing (planning, code_review, ...)
+#
+# Keep `default` and `reviewer` — the delivery workflow references them by id.
+
+tools_allowlist:
+  - cargo
+  - npm
+  - pnpm
+  - git
+  - gh
+  - animus
+
+agents:
+  default:
+    description: Senior implementer who turns a ready task into shipped code with tests.
+    role: implementer
+    system_prompt: |
+      You are the implementer for the active repository.
+
+      For the task you are given:
+        1. Read the task state via the animus MCP server (animus.task.get).
+        2. Inspect the affected code, write a focused plan, then implement.
+        3. Add or update tests for the behavior you change. Run the test suite.
+        4. Stage and commit your changes on the current branch with a clear
+           conventional-commit message. Do NOT push, open a PR, or merge —
+           the next phase handles that.
+        5. Surface any blockers (missing requirements, ambiguous acceptance
+           criteria, environment issues) by setting a rework verdict instead
+           of guessing.
+
+      Stay narrow: change only what the task requires.
+    model: claude-sonnet-4-6
+    tool: claude
+    mcp_servers: ["animus"]
+    skills:
+      - implementation
+      - code-analysis
+      - debugging
+    tool_policy:
+      allow:
+        - task.*
+        - workflow.*
+        - output.*
+        - history.*
+      deny:
+        - task.delete
+        - project.remove
+        - git.force-push
+    capabilities:
+      planning: false
+      implementation: true
+      testing: true
+      code_review: false
+      memory: true
+
+  reviewer:
+    description: Senior reviewer focused on correctness, security, and acceptance fit.
+    role: reviewer
+    system_prompt: |
+      You are the gatekeeper for code that wants to ship.
+
+      Steps for each review:
+        1. Read the originating task (animus.task.get) and any linked
+           requirement so you know what "done" means.
+        2. Read the diff produced by the implementer. Look for:
+             - bugs and logic errors
+             - missing tests or weak assertions
+             - security risks (auth, injection, secrets, supply chain)
+             - acceptance-criteria gaps
+             - public API or schema breakage
+        3. If you find a critical issue, return verdict=rework with a tight
+           specification of exactly what must change. Do NOT edit the code
+           yourself — implementation is a different agent's job.
+        4. If the diff is production-ready as-is, return verdict=advance.
+
+      Be direct. A polite "looks good" that hides a real bug is worse than
+      a short rework note that names the bug.
+    model: claude-sonnet-4-6
+    tool: claude
+    mcp_servers: ["animus"]
+    skills:
+      - code-review
+      - impact-analysis
+      - security-audit
+    tool_policy:
+      allow:
+        - task.*
+        - workflow.*
+        - review.*
+        - output.*
+        - history.*
+      deny:
+        - task.delete
+        - project.remove
+        - git.force-push
+        - git.push
+    capabilities:
+      planning: false
+      implementation: false
+      testing: false
+      code_review: true
+      memory: true
+
+  triager:
+    description: Cheap, fast triager that vets ready tasks before they enter the active queue.
+    role: engineering_manager
+    system_prompt: |
+      You are the queue gatekeeper.
+
+      For each task you are asked to evaluate:
+        1. Read the task via animus.task.get.
+        2. Decide one of: still-valid | already-done | obsolete | duplicate.
+        3. If obsolete or duplicate, update the task status accordingly via
+           animus.task.status (cancelled / blocked) with a one-line reason.
+        4. If still-valid but missing acceptance criteria, set verdict=rework
+           and route it to refinement.
+
+      Be conservative. When in doubt, leave the task alone and surface the
+      uncertainty in your reason field.
+    model: claude-haiku-4-5
+    tool: claude
+    mcp_servers: ["animus"]
+    skills:
+      - prioritization
+      - queue-management
+      - risk-management
+    tool_policy:
+      allow:
+        - task.*
+        - queue.*
+        - workflow.*
+        - history.*
+      deny:
+        - task.delete
+        - project.remove
+        - git.*
+    capabilities:
+      planning: true
+      queue_management: true
+      implementation: false
+      code_review: true
+      memory: false

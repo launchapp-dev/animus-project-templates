@@ -1,0 +1,28 @@
+# Schedules fire workflows on cron expressions, evaluated by the daemon each tick.
+#
+# The conductor pattern ships ONE active schedule by default: a work-planner
+# that picks up the next ready task every 10 minutes and runs it through the
+# standard delivery workflow. This is what makes the conductor pattern feel
+# autonomous.
+#
+# Disable it (set `enabled: false`) if you want the daemon to wait for
+# explicit `animus workflow run --task-id <id>` invocations instead.
+
+schedules:
+  - id: work-planner
+    cron: "*/10 * * * *"
+    workflow_ref: standard-workflow
+    enabled: true
+    description: |
+      Picks up the next ready, unblocked task every 10 minutes and runs it
+      through the standard delivery workflow. Combine with
+      `animus daemon start --autonomous` for a hands-off conductor loop.
+
+# Example: run requirements planning at the top of every hour to pick up
+# any new requirements you've drafted.
+#
+#   - id: requirements-planner
+#     cron: "0 * * * *"
+#     workflow_ref: requirements-workflow
+#     enabled: false
+#     description: Decompose any newly-drafted requirements into tasks.
