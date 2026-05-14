@@ -11,7 +11,7 @@ next_steps = [
 ]
 
 [[packs]]
-id = "ao.task"
+id = "animus.task"
 activate = true
 
 [source]

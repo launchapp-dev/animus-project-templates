@@ -3,4 +3,4 @@ workflows:
     name: Conductor Research Workflow
     description: Lightweight wrapper for validating scope and triaging work before execution.
     phases:
-      - workflow_ref: ao.task/triage
+      - workflow_ref: animus.task/triage

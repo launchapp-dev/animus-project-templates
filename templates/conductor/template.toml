@@ -11,11 +11,11 @@ next_steps = [
 ]
 
 [[packs]]
-id = "ao.requirement"
+id = "animus.requirement"
 activate = true
 
 [[packs]]
-id = "ao.task"
+id = "animus.task"
 activate = true
 
 [source]
